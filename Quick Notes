@@ -1,0 +1,31 @@
+8KB RAM @1MHz (1,048,576 Hz)
+8KB VRAM @ 2MHz (2,097,152)
+CPU LR35902 @ 4MHz (4,194,304 Hz)
+PPU @ 4MHz (4,194,304 Hz)
+
+10 Registers
+    -A (8bit)
+    -B (8bit)
+    -C (8bit) 
+    -D (8bit)
+    -E (8bit)
+    -F (8bit)
+    -H (8bit)
+    -L (8bit)
+    -SP (16bit)
+    -PC (16bit)
+
+-Can combine registers to become 16bit registers (could be used to hold pointers)
+-Can see max 64KB of address space
+-8bit Opcode length
+-16bit immediates are stored as big endian
+
+
+
+Model
+    -CPU
+    -RAM
+    -VRAM
+
+
+
