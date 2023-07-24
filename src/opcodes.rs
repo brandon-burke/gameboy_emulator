@@ -88,6 +88,9 @@ Opcode::SET(2),  Opcode::SET(2),  Opcode::SET(2),  Opcode::SET(2),   Opcode::SET
 ];
 
 impl Opcode {
-    
+    //Load/Copy value in right register to left register
+    fn ld_r8_r8(right: &u8, left: &u8) {
+
+    }
 
 }
