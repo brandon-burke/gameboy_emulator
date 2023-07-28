@@ -1,8 +1,2 @@
-Done so far
-    -Completed structure of cpu (register)
-    -Completed memory map structure
-    -implemented getting the combined register values
-    -implemented getting, setting, and reseting flag register value (reg f)
-
-Need to do
-    -Implement all opcodes
+Do now:
+    -Write the execute method so that you have to give it an opcode to start execution
