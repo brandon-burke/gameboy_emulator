@@ -220,7 +220,7 @@ impl Cpu {
      * MACHINE CYCLES: 1
      * INSTRUCTION LENGTH: 1
      */
-    pub fn NOP(&self) {
+    pub fn nop(&self) {
         return;
     }
 
@@ -230,7 +230,7 @@ impl Cpu {
      * MACHINE CYCLES: 3
      * INSTRUCTION LENGTH: 3
      */
-    pub fn LD_r16_u16(&mut self, memory: &Memory, high_reg: Register, low_reg: Register) {
+    pub fn ld_r16_u16(&mut self, memory: &Memory, high_reg: Register, low_reg: Register) {
         let lower_byte: u8 = memory.read_byte(self.pc);
         self.pc += 1;
         let upper_byte: u8 = memory.read_byte(self.pc);
@@ -250,7 +250,7 @@ impl Cpu {
      * MACHINE CYCLES: 4
      * INSTRUCTION LENGTH: 3
      */
-    pub fn LD_r16_A(&mut self, memory: &mut Memory, high_reg: Register, low_reg: Register) {
+    pub fn ld_r16_a(&mut self, memory: &mut Memory, high_reg: Register, low_reg: Register) {
         let address = match (&high_reg, &low_reg) {
             (Register::B, Register::C) => self.bc(),
             (Register::D, Register::E) => self.de(),
@@ -266,7 +266,7 @@ impl Cpu {
      * MACHINE CYCLES: 2
      * INSTRUCTION LENGTH: 1
      */
-    pub fn INC_r16(&mut self, high_reg: Register, low_reg: Register) {
+    pub fn inc_r16(&mut self, high_reg: Register, low_reg: Register) {
         match (&high_reg, &low_reg) {
             (Register::B, Register::C) => self.set_bc(self.bc() + 1),
             (Register::D, Register::E) => self.set_de(self.de() + 1),
@@ -281,7 +281,7 @@ impl Cpu {
      * MACHINE CYCLES: 1
      * INSTRUCTION LENGTH: 1
      */
-    pub fn INC_r8(&mut self, reg: Register) {
+    pub fn inc_r8(&mut self, reg: Register) {
         let mut result: u8 = 0;
         match reg {
             Register::A => { result = self.a + 1; self.a = result; }, 
@@ -316,7 +316,7 @@ impl Cpu {
      * MACHINE CYCLES: 1
      * INSTRUCTION LENGTH: 1
      */
-    pub fn DEC_r8(&mut self, reg: Register) {
+    pub fn dec_r8(&mut self, reg: Register) {
         let mut result: u8 = 0;
         match reg {
             Register::A => { result = self.a - 1; self.a = result; }, 
@@ -351,7 +351,7 @@ impl Cpu {
      * MACHINE CYCLES: 2
      * INSTRUCTION LENGTH: 2
      */
-    pub fn LD_r8_u8(&mut self, memory: &Memory, reg: Register) {
+    pub fn ld_r8_u8(&mut self, memory: &Memory, reg: Register) {
         match reg {
             Register::A => self.a = memory.read_byte(self.pc),
             Register::B => self.b = memory.read_byte(self.pc),
@@ -372,17 +372,18 @@ impl Cpu {
      * MACHINE CYCLES: 1
      * INSTRUCTION LENGTH: 1
      */
-    pub fn RCLA(&mut self) {
-        let last_bit = Self::get_bit(self.a, 0);
+    pub fn rlca(&mut self) {
+        let rotated_bit: u8 = Self::get_bit(self.a, 7);
+        self.a = (self.a << 1) | rotated_bit;
 
-        self.a << 1;
-        
         self.reset_zero_flag();
         self.reset_add_sub_flag();
         self.reset_half_carry_flag();
-
-
-        
+        if rotated_bit != 0 {
+            self.set_carry_flag();
+        } else {
+            self.reset_carry_flag();
+        }
     }
 
     /**
@@ -390,14 +391,15 @@ impl Cpu {
     */
     pub fn exexute(&mut self, opcode: u8, memory: &mut Memory) {
         match opcode {
-            0x00 => self.NOP(),
-            0x01 => self.LD_r16_u16(memory, Register::B, Register::C),
-            0x02 => self.LD_r16_A(memory, Register::B, Register::C),
-            0x03 => self.INC_r16(Register::B, Register::C),
-            0x04 => self.INC_r8(Register::B),
-            0x05 => self.DEC_r8(Register::B),
-            0x06 => self.LD_r8_u8(memory, Register::B),
-            0x07 => self.RLCA_r8(),
+            0x00 => self.nop(),
+            0x01 => self.ld_r16_u16(memory, Register::B, Register::C),
+            0x02 => self.ld_r16_a(memory, Register::B, Register::C),
+            0x03 => self.inc_r16(Register::B, Register::C),
+            0x04 => self.inc_r8(Register::B),
+            0x05 => self.dec_r8(Register::B),
+            0x06 => self.ld_r8_u8(memory, Register::B),
+            0x07 => self.rlca(),
+            0x08 =>
             _ => (),
         }
     }

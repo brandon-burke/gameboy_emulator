@@ -1,7 +1,6 @@
 mod cpu;
 mod memory;
 
-use crate::cpu::Cpu;
 use std::env;
 use std::fs;
 
