@@ -212,20 +212,7 @@ impl Cpu {
         return opcode;
     }  
 
-    /**
-     * Given an opcode it will execute the instruction of the opcode
-     */
-    pub fn exexute(&mut self, opcode: u8, memory: &mut Memory) {
-        match opcode {
-            0x00 => self.NOP(),
-            0x01 => self.LD_r16_u16(memory, Register::B, Register::C),
-            0x02 => self.LD_r16_A(memory, Register::B, Register::C),
-            0x03 => self.INC_r16(Register::B, Register::C),
-            0x04 => self.INC_r8(Register::B),
-            0x05 => self.DEC_r8(Register::B),
-            _ => (),
-        }
-    }
+
 
     /**
      * Does absolutely nothing but consume a machine cycle and increment the pc
@@ -258,7 +245,7 @@ impl Cpu {
     }
 
     /**
-     * Store value in register A into the byte pointed to by register r16.
+     * Store the value in register A into the byte pointed to by register r16.
      * 
      * MACHINE CYCLES: 4
      * INSTRUCTION LENGTH: 3
@@ -295,27 +282,28 @@ impl Cpu {
      * INSTRUCTION LENGTH: 1
      */
     pub fn INC_r8(&mut self, reg: Register) {
+        let mut result: u8 = 0;
         match reg {
-            Register::A => self.a += 1,
-            Register::B => self.a += 1,
-            Register::C => self.a += 1,
-            Register::D => self.a += 1,
-            Register::E => self.a += 1,
+            Register::A => { result = self.a + 1; self.a = result; }, 
+            Register::B => { result = self.b + 1; self.b = result; },
+            Register::C => { result = self.c + 1; self.c = result; },
+            Register::D => { result = self.d + 1; self.d = result; },
+            Register::E => { result = self.e + 1; self.e = result; },
             Register::F => panic!("Cannot increment the f register"),
-            Register::H => self.a += 1,
-            Register::L => self.a += 1,
+            Register::H => { result = self.h + 1; self.h = result; },
+            Register::L => { result = self.l + 1; self.l = result; },
             _ => panic!("Cannot increment the sp and pc as this is a 8bit instruction")
-        }
+        };
 
         self.reset_add_sub_flag();
 
-        if self.a == 0 {
+        if result == 0 {
             self.set_zero_flag();
         } else {
             self.reset_zero_flag();
         }
 
-        if (self.a & 0xF) + 1 > 0xF {
+        if (result & 0xF) + 1 > 0xF {
             self.set_half_carry_flag();
         } else {
             self.reset_half_carry_flag();
@@ -329,7 +317,89 @@ impl Cpu {
      * INSTRUCTION LENGTH: 1
      */
     pub fn DEC_r8(&mut self, reg: Register) {
-        self.a -= 1;
+        let mut result: u8 = 0;
+        match reg {
+            Register::A => { result = self.a - 1; self.a = result; }, 
+            Register::B => { result = self.b - 1; self.b = result; },
+            Register::C => { result = self.c - 1; self.c = result; },
+            Register::D => { result = self.d - 1; self.d = result; },
+            Register::E => { result = self.e - 1; self.e = result; },
+            Register::F => panic!("Cannot decrement the f register"),
+            Register::H => { result = self.h - 1; self.h = result; },
+            Register::L => { result = self.l - 1; self.l = result; },
+            _ => panic!("Cannot decrement the sp and pc as this is a 8bit instruction")
+        };
+
+        if result == 0 {
+            self.set_zero_flag();
+        } else {
+            self.reset_zero_flag();
+        }
+
+        if result & 0xF == 0xF {
+            self.set_half_carry_flag();
+        } else {
+            self.reset_half_carry_flag();
+        }
+
+        self.set_add_sub_flag();
+    }
+
+    /**
+     * Load value u8 into register r8
+     * 
+     * MACHINE CYCLES: 2
+     * INSTRUCTION LENGTH: 2
+     */
+    pub fn LD_r8_u8(&mut self, memory: &Memory, reg: Register) {
+        match reg {
+            Register::A => self.a = memory.read_byte(self.pc),
+            Register::B => self.b = memory.read_byte(self.pc),
+            Register::C => self.c = memory.read_byte(self.pc),
+            Register::D => self.d = memory.read_byte(self.pc),
+            Register::E => self.e = memory.read_byte(self.pc),
+            Register::F => panic!("Cannot load into the f register"),
+            Register::H => self.h = memory.read_byte(self.pc),
+            Register::L => self.l = memory.read_byte(self.pc),
+            _ => panic!("Cannot use sp and pc as this is a 8 bit instruction"),
+        }
+        self.pc += 1;
+    }
+
+    /**
+     * Rotate register A left.
+     * 
+     * MACHINE CYCLES: 1
+     * INSTRUCTION LENGTH: 1
+     */
+    pub fn RCLA(&mut self) {
+        let last_bit = Self::get_bit(self.a, 0);
+
+        self.a << 1;
+        
+        self.reset_zero_flag();
+        self.reset_add_sub_flag();
+        self.reset_half_carry_flag();
+
+
+        
+    }
+
+    /**
+    * Given an opcode it will execute the instruction of the opcode
+    */
+    pub fn exexute(&mut self, opcode: u8, memory: &mut Memory) {
+        match opcode {
+            0x00 => self.NOP(),
+            0x01 => self.LD_r16_u16(memory, Register::B, Register::C),
+            0x02 => self.LD_r16_A(memory, Register::B, Register::C),
+            0x03 => self.INC_r16(Register::B, Register::C),
+            0x04 => self.INC_r8(Register::B),
+            0x05 => self.DEC_r8(Register::B),
+            0x06 => self.LD_r8_u8(memory, Register::B),
+            0x07 => self.RLCA_r8(),
+            _ => (),
+        }
     }
 
 
