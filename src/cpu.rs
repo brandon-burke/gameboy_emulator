@@ -721,6 +721,326 @@ impl Cpu {
     }
 
     /**
+     * Add the value in sp to hl
+     * 
+     * MACHINE CYCLES: 2
+     * INSTRUCTION LENGTH: 1
+     */
+    pub fn add_hl_sp(&mut self) {
+        let (result, overflow) = self.hl().overflowing_add(self.sp);
+        let half_carry_overflow = (self.hl() & 0x0FFF) + (self.sp & 0x0FFF) > 0x0FFF;
+
+        self.set_hl(result);
+        self.arithmetic_16bit_flag_update(result, half_carry_overflow, overflow);
+    }
+
+    /**
+     * Load value into register A from the byte pointed by HL and decrement HL afterwards.
+     * 
+     * MACHINE CYCLES: 2
+     * INSTRUCTION LENGTH: 1
+     */
+    pub fn ld_a_hld(&mut self, memory: &Memory) {
+        let hl_data = memory.read_byte(self.hl());
+        self.a = hl_data;
+        self.set_hl(self.hl() - 1);
+    }
+
+    /**
+    * Decrement value in register SP by 1.
+    * 
+    * MACHINE CYCLES: 2
+    * INSTRUCTION LENGTH: 1
+    */
+    pub fn dec_sp(&mut self) {
+        self.sp -= 1;
+    }
+
+    /**
+    * Complement the carry flag
+    */
+    pub fn ccf(&mut self) {
+        self.reset_add_sub_flag();
+        self.reset_half_carry_flag();
+
+        if self.get_carry_flag() == 0 {
+            self.set_carry_flag();
+        } else {
+            self.reset_carry_flag();
+        }
+    }
+
+    /**
+     * Load (copy) value in register on the right into register on the left.
+     * 
+     * MACHINE CYCLES: 1
+     * INSTRUCTION LENGTH: 1
+     */
+    pub fn ld_r8_r8(&mut self, reg_left: Register, reg_right: Register) {
+        let value = match reg_right {
+            Register::A => self.a,
+            Register::B => self.b,
+            Register::C => self.c,
+            Register::D => self.d,
+            Register::E => self.e,
+            Register::F => panic!("Cannot use the f register in (ld_r8_r8)"),
+            Register::H => self.h,
+            Register::L => self.l,
+            _ => panic!("Cannot use sp or pc register this is a 8 bit operation (ld_r8_r8)")
+        };
+
+        match reg_left {
+            Register::A => self.a = value,
+            Register::B => self.b = value,
+            Register::C => self.c = value,
+            Register::D => self.d = value,
+            Register::E => self.e = value,
+            Register::F => panic!("Cannot use the f register in (ld_r8_r8)"),
+            Register::H => self.h = value,
+            Register::L => self.l = value,
+            _ => panic!("Cannot use sp or pc register this is a 8 bit operation (ld_r8_r8)")
+        }
+    }
+    
+    /**
+     * Load value into register r8 from the byte pointed to by register HL.
+     * 
+     * MACHINE CYCLES: 2
+     * INSTRUCTION LENGTH: 1
+     */
+    pub fn ld_r8_hl(&mut self, memory: &Memory, reg: Register) {
+        let hl_data = memory.read_byte(self.hl());
+
+        match reg {
+            Register::A => self.a = hl_data,
+            Register::B => self.b = hl_data,
+            Register::C => self.c = hl_data,
+            Register::D => self.d = hl_data,
+            Register::E => self.e = hl_data,
+            Register::F => panic!("Cannot use f register (ld_r8_hl)"),
+            Register::H => self.f = hl_data,
+            Register::L => self.l = hl_data,
+            _ => panic!("Cannot use sp or pc as this is a 8 bit operation (ld_r8_hl)"),
+        }
+    }
+
+    /**
+     * Store value in register r8 into the byte pointed to by register HL.
+     * 
+     * MACHINE CYCLES: 2
+     * INSTRUCTION LENGTH: 1
+     */
+    pub fn ld_hl_r8(&mut self, memory: &mut Memory, reg: Register) {
+        let value = match reg {
+            Register::A => self.a,
+            Register::B => self.b,
+            Register::C => self.c,
+            Register::D => self.d,
+            Register::E => self.e,
+            Register::F => panic!("Cannot use f register (ld_hl_r8)"),
+            Register::H => self.f,
+            Register::L => self.l,
+            _ => panic!("Cannot use sp or pc as this is a 8 bit operation (ld_hl_r8)"),
+        };
+
+        memory.write_byte(self.hl(), value);
+    }
+
+    /**
+     * Enter CPU low-power consumption mode until an interrupt occurs. 
+     * The exact behavior of this instruction depends on the state of the IME flag.
+     * 
+     * MACHINE CYCLES: -
+     * INSTRUCTION LENGTH: 1
+     */
+    pub fn halt(&mut self) {
+        todo!();
+    }
+
+    /**
+     * Add the value in r8 to A.
+     * 
+     * MACHINE CYCLES: 1
+     * INSTRUCTION LENGTH: 1 
+     */
+    pub fn add_a_r8(&mut self, reg: Register) {
+        let value = match reg {
+            Register::A => self.a,
+            Register::B => self.b,
+            Register::C => self.c,
+            Register::D => self.d,
+            Register::E => self.e,
+            Register::F => panic!("Cannot use f register in (add_a_r8)"),
+            Register::H => self.h,
+            Register::L => self.l,
+            _ => panic!("cannot use sp or pc in a this 8 bit operation (add_a_r8)")
+        };
+
+        let (result, overflow) = self.a.overflowing_add(value);
+        let half_carry_overflow = (self.a & 0xF) + (value & 0xF) > 0xF;
+
+        self.a = result;
+        self.arithmetic_8bit_flag_update(result, half_carry_overflow, overflow);
+    }
+
+    /**
+    * Add the byte pointed to by HL to A.
+    * 
+    * MACHINE CYCLES: 2
+    * INSTRUCTION LENGTH: 1 
+    */
+    pub fn add_a_hl(&mut self, memory: &Memory) {
+        let hl_data = memory.read_byte(self.hl());
+        let (result, overflow) = self.a.overflowing_add(hl_data);
+        let half_carry_overflow = (self.a & 0xF) + (hl_data & 0xF) > 0xF;
+
+        self.a = result;
+        self.arithmetic_8bit_flag_update(result, half_carry_overflow, overflow);
+    }
+
+    /**
+     * Add the value in r8 plus the carry flag to A.
+     * 
+     * MACHINE CYCLES: 1
+     * INSTRUCTION LENGTH: 1 
+     */
+    pub fn adc_a_r8(&mut self, reg: Register) {
+        let value = match reg {
+            Register::A => self.a,
+            Register::B => self.b,
+            Register::C => self.c,
+            Register::D => self.d,
+            Register::E => self.e,
+            Register::F => panic!("Cannot use f register in (adc_a_r8)"),
+            Register::H => self.h,
+            Register::L => self.l,
+            _ => panic!("cannot use sp or pc in a this 8 bit operation (adc_a_r8)")
+        };
+
+        let (partial_result, first_overflow) = self.a.overflowing_add(value);
+        let (result, second_overflow) = partial_result.overflowing_add(self.get_carry_flag());
+        let half_carry_overflow = (self.a & 0xF) + (value & 0xF) + self.get_carry_flag() > 0xF;
+
+        self.a = result;
+        self.arithmetic_8bit_flag_update(result, half_carry_overflow, first_overflow || second_overflow);
+    }
+
+    
+    /**
+     * Add the byte pointed to by HL plus the carry flag to A.
+     * 
+     * MACHINE CYCLES: 2
+     * INSTRUCTION LENGTH: 1 
+     */
+    pub fn adc_a_hl(&mut self, memory: &Memory) {
+        let hl_data = memory.read_byte(self.hl());
+        let (partial_result, first_overflow) = self.a.overflowing_add(hl_data);
+        let (result, second_overflow) = partial_result.overflowing_add(self.get_carry_flag());
+        let half_carry_overflow = (self.a & 0xF) + (hl_data & 0xF) + self.get_carry_flag() > 0xF;
+
+        self.a = result;
+        self.arithmetic_8bit_flag_update(result, half_carry_overflow, first_overflow || second_overflow);
+    }
+
+    /**
+    * Subtract the value in r8 from A.
+    * 
+    * MACHINE CYCLES: 1
+    * INSTRUCTION LENGTH: 1
+    */
+    pub fn sub_a_r8(&mut self, reg: Register) {
+        let reg_value = match reg {
+            Register::A => self.a,
+            Register::B => self.b,
+            Register::C => self.c,
+            Register::D => self.d,
+            Register::E => self.e,
+            Register::F => panic!("Cannot use f register in (adc_a_r8)"),
+            Register::H => self.h,
+            Register::L => self.l,
+            _ => panic!("cannot use sp or pc in a this 8 bit operation (adc_a_r8)")
+        };
+
+        let result = self.a - reg_value;
+        self.a = result;
+        
+        self.set_add_sub_flag();
+
+        if result == 0 {
+            self.set_zero_flag();
+        } else {
+            self.reset_zero_flag();
+        }
+
+        if result & 0xF == 0xF {
+            self.set_half_carry_flag();
+        } else {
+            self.reset_half_carry_flag();
+        }
+
+        if reg_value > self.a {
+            self.set_carry_flag();
+        } else {
+            self.reset_carry_flag();
+        }
+    }
+
+    /**
+     * Subtract the byte pointed to by HL from A.
+     * 
+     * MACHINE CYCLES: 2
+     * INSTRUCTION LENGTH: 1
+     */
+    pub fn sub_a_hl(&mut self, memory: &Memory) {
+        let hl_data = memory.read_byte(self.hl());
+        let result = self.a - hl_data;
+
+        self.a = result;
+
+        self.set_add_sub_flag();
+
+        if result == 0 {
+            self.set_zero_flag();
+        } else {
+            self.reset_zero_flag();
+        }
+
+        if hl_data > self.a {
+            self.set_carry_flag();
+        } else {
+            self.reset_carry_flag();
+        }
+    }
+
+    /**
+     * Subtract the value in r8 and the carry flag from A.
+     * 
+     * MACHINE CYCLES: 1
+     * INSTRUCTION LENGTH: 1
+     */
+    pub fn sbc_a_r8(&mut self, reg: Register) {
+        let reg_value = match reg {
+            Register::A => self.a,
+            Register::B => self.b,
+            Register::C => self.c,
+            Register::D => self.d,
+            Register::E => self.e,
+            Register::F => panic!("Cannot use f register in (adc_a_r8)"),
+            Register::H => self.h,
+            Register::L => self.l,
+            _ => panic!("cannot use sp or pc in a this 8 bit operation (adc_a_r8)")
+        };
+
+        let result = 
+
+        if reg_value + self.get_carry_flag() > self.a {
+            self.set_carry_flag();
+        } else {
+            self.reset_carry_flag();
+        }
+    }
+
+    /**
     * Given an opcode it will execute the instruction of the opcode
     */
     pub fn exexute(&mut self, opcode: u8, memory: &mut Memory) {
@@ -782,7 +1102,103 @@ impl Cpu {
             0x36 => self.ld_hl_u8(memory),
             0x37 => self.scf(),
             0x38 => self.jr_cc_i8(memory, self.get_carry_flag()),
-            0x39 => 
+            0x39 => self.add_hl_sp(),
+            0x3A => self.ld_a_hld(memory),
+            0x3B => self.dec_sp(),
+            0x3C => self.inc_r8(Register::A),
+            0x3D => self.dec_r8(Register::A),
+            0x3E => self.ld_r8_u8(memory, Register::A),
+            0x3F => self.ccf(),
+            0x40 => self.ld_r8_r8(Register::B, Register::B),
+            0x41 => self.ld_r8_r8(Register::B, Register::C),
+            0x42 => self.ld_r8_r8(Register::B, Register::D),
+            0x43 => self.ld_r8_r8(Register::B, Register::E),
+            0x44 => self.ld_r8_r8(Register::B, Register::H),
+            0x45 => self.ld_r8_r8(Register::B, Register::L),
+            0x46 => self.ld_r8_hl(memory, Register::B),
+            0x47 => self.ld_r8_r8(Register::B, Register::A),
+            0x48 => self.ld_r8_r8(Register::C, Register::B),
+            0x49 => self.ld_r8_r8(Register::C, Register::C),
+            0x4A => self.ld_r8_r8(Register::C, Register::D),
+            0x4B => self.ld_r8_r8(Register::C, Register::E),
+            0x4C => self.ld_r8_r8(Register::C, Register::H),
+            0x4D => self.ld_r8_r8(Register::C, Register::L),
+            0x4E => self.ld_r8_hl(memory, Register::C),
+            0x4F => self.ld_r8_r8(Register::C, Register::A),
+            0x50 => self.ld_r8_r8(Register::D, Register::B),
+            0x51 => self.ld_r8_r8(Register::D, Register::C),
+            0x52 => self.ld_r8_r8(Register::D, Register::D),
+            0x53 => self.ld_r8_r8(Register::D, Register::E),
+            0x54 => self.ld_r8_r8(Register::D, Register::H),
+            0x55 => self.ld_r8_r8(Register::D, Register::L),
+            0x56 => self.ld_r8_hl(memory, Register::D),
+            0x57 => self.ld_r8_r8(Register::D, Register::A),
+            0x58 => self.ld_r8_r8(Register::E, Register::B),
+            0x59 => self.ld_r8_r8(Register::E, Register::C),
+            0x5A => self.ld_r8_r8(Register::E, Register::D),
+            0x5B => self.ld_r8_r8(Register::E, Register::E),
+            0x5C => self.ld_r8_r8(Register::E, Register::H),
+            0x5D => self.ld_r8_r8(Register::E, Register::L),
+            0x5E => self.ld_r8_hl(memory, Register::E),
+            0x5F => self.ld_r8_r8(Register::E, Register::A),
+            0x60 => self.ld_r8_r8(Register::H, Register::B),
+            0x61 => self.ld_r8_r8(Register::H, Register::C),
+            0x62 => self.ld_r8_r8(Register::H, Register::D),
+            0x63 => self.ld_r8_r8(Register::H, Register::E),
+            0x64 => self.ld_r8_r8(Register::H, Register::H),
+            0x65 => self.ld_r8_r8(Register::H, Register::L),
+            0x66 => self.ld_r8_hl(memory, Register::H),
+            0x67 => self.ld_r8_r8(Register::H, Register::A),
+            0x68 => self.ld_r8_r8(Register::L, Register::B),
+            0x69 => self.ld_r8_r8(Register::L, Register::C),
+            0x6A => self.ld_r8_r8(Register::L, Register::D),
+            0x6B => self.ld_r8_r8(Register::L, Register::E),
+            0x6C => self.ld_r8_r8(Register::L, Register::H),
+            0x6D => self.ld_r8_r8(Register::L, Register::L),
+            0x6E => self.ld_r8_hl(memory, Register::L),
+            0x6F => self.ld_r8_r8(Register::L, Register::A),
+            0x70 => self.ld_hl_r8(memory, Register::B),
+            0x71 => self.ld_hl_r8(memory, Register::C),
+            0x72 => self.ld_hl_r8(memory, Register::D),
+            0x73 => self.ld_hl_r8(memory, Register::E),
+            0x74 => self.ld_hl_r8(memory, Register::H),
+            0x75 => self.ld_hl_r8(memory, Register::L),
+            0x76 => self.halt(),
+            0x77 => self.ld_hl_r8(memory, Register::A),
+            0x78 => self.ld_r8_r8(Register::A, Register::B),
+            0x79 => self.ld_r8_r8(Register::A, Register::C),
+            0x7A => self.ld_r8_r8(Register::A, Register::D),
+            0x7B => self.ld_r8_r8(Register::A, Register::E),
+            0x7C => self.ld_r8_r8(Register::A, Register::H),
+            0x7D => self.ld_r8_r8(Register::A, Register::L),
+            0x7E => self.ld_r8_hl(memory, Register::A), 
+            0x7F => self.ld_r8_r8(Register::A, Register::A),
+            0x80 => self.add_a_r8(Register::B),
+            0x81 => self.add_a_r8(Register::C),
+            0x82 => self.add_a_r8(Register::D),
+            0x83 => self.add_a_r8(Register::E),
+            0x84 => self.add_a_r8(Register::H),
+            0x85 => self.add_a_r8(Register::L),
+            0x86 => self.add_a_hl(memory),
+            0x87 => self.add_a_r8(Register::A),
+            0x88 => self.adc_a_r8(Register::B),
+            0x89 => self.adc_a_r8(Register::C),
+            0x8A => self.adc_a_r8(Register::D),
+            0x8B => self.adc_a_r8(Register::E),
+            0x8C => self.adc_a_r8(Register::H),
+            0x8D => self.adc_a_r8(Register::L),
+            0x8E => self.adc_a_hl(memory),
+            0x8F => self.adc_a_r8(Register::A),
+            0x90 => self.sub_a_r8(Register::B),
+            0x91 => self.sub_a_r8(Register::C),
+            0x92 => self.sub_a_r8(Register::D),
+            0x93 => self.sub_a_r8(Register::E),
+            0x94 => self.sub_a_r8(Register::H),
+            0x95 => self.sub_a_r8(Register::L),
+            0x96 => self.sub_a_hl(memory),
+            0x97 => self.sub_a_r8(Register::A),
+            0x98 => self.sbc_a_r8(),
+
             _ => (),
         }
     }
@@ -815,37 +1231,8 @@ impl Cpu {
 
 
 
-    /**
-     * Add the value in r8 plus the carry flag to A register.
-     * 
-     * INSTRUCTION LENGTH: 1 BYTE
-     * MACHINE CYCLES: 1
-     */
-    pub fn ADC_A_r8(&mut self, reg: u8) {   
-        let (partial_result, first_overflow) = self.a.overflowing_add(reg);
-        let (result, second_overflow) = partial_result.overflowing_add(self.get_carry_flag());
-        let half_carry_overflow = (self.a & 0xF) + (reg & 0xF) + self.get_carry_flag() > 0xF;
 
-        self.a = result;
-        self.arithmetic_8bit_flag_update(result, half_carry_overflow, first_overflow || second_overflow);
-    }
 
-    /**
-     * Adds to the 8-bit A register, the carry flag and data from the absolute address 
-     * specified by the 16-bit register HL, and stores the result back into the A register.
-     * 
-     * MACHINE CYCLES: 2
-     * INSTRUCTION LENGTH: 1 BYTE
-     */
-    pub fn ADC_A_HL(&mut self, memory: &Memory) {
-        let hl_data = memory.read_byte(self.hl());
-        let (partial_result, first_overflow) = self.a.overflowing_add(hl_data);
-        let (result, second_overflow) = partial_result.overflowing_add(self.get_carry_flag());
-        let half_carry_overflow = (self.a & 0xF) + (hl_data & 0xF) + self.get_carry_flag() > 0xF;
-
-        self.a = result;
-        self.arithmetic_8bit_flag_update(result, half_carry_overflow, first_overflow || second_overflow);
-    }
 
     /**
      * Adds to the 8-bit A register, the carry flag and the immediate data n, 
@@ -863,36 +1250,9 @@ impl Cpu {
         self.arithmetic_8bit_flag_update(result, half_carry_overflow, first_overflow || second_overflow);
     }
 
-    /**
-     * Adds to the 8-bit A register, the 8-bit register r, and stores the result 
-     * back into the A register.
-     * 
-     * MACHINE CYCLES: 1
-     * INSTRUCTION LENGTH: 1 BYTE
-     */
-    pub fn ADD_A_r8(&mut self, reg: u8) {
-        let (result, overflow) = self.a.overflowing_add(reg);
-        let half_carry_overflow = (self.a & 0xF) + (reg & 0xF) > 0xF;
 
-        self.a = result;
-        self.arithmetic_8bit_flag_update(result, half_carry_overflow, overflow);
-    }
 
-    /**
-     * Adds to the 8-bit A register, data from the absolute address specified by 
-     * the 16-bit register HL, and stores the result back into the A register.
-     * 
-     * MACHINE CYCLES: 2
-     * INSTRUCTION LENGTH: 1 BYTE
-     */
-    pub fn ADD_A_HL(&mut self, memory: &Memory) {
-        let hl_data = memory.read_byte(self.hl());
-        let (result, overflow) = self.a.overflowing_add(hl_data);
-        let half_carry_overflow = (self.a & 0xF) + (hl_data & 0xF) > 0xF;
 
-        self.a = result;
-        self.arithmetic_8bit_flag_update(result, half_carry_overflow, overflow);
-    }
 
     /**
      * Adds to the 8-bit A register, the immediate data n, and stores the result 
