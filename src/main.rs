@@ -12,7 +12,7 @@ fn main() {
 
 
     for byte in rom_dump {
-        println!("{:#04X}", byte);
+        print!("{:#04X}", byte);
         /* 
         if was_prefix {
             println!("{:?}", LOOKUP_TABLE_PREFIX[byte as usize]);
