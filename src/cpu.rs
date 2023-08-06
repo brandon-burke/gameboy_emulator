@@ -1,4 +1,7 @@
 use crate::memory::{Memory, self};
+use crate::opcodes::{OPCODE_MACHINE_CYCLES, PREFIX_OPCODE_MACHINE_CYCLES};
+
+const MACHINE_CYCLE: u8 = 4;
 
 pub enum Conditions {
     Zero,
@@ -23,6 +26,12 @@ pub enum Register {
     PC,
 }
 
+pub enum CpuState {
+    Fetch,          //Indicates the stage where we are getting the next opcode
+    PreExecute,     //Indicates the stage where we are waiting a certain length of M-Cycles before excuting the instruction
+    Execute,        //Indicated the stage where we are doing that actual work of the instruction
+}
+
 pub struct Cpu {
     pub a: u8,      //Accumulator
     pub b: u8,      //General Purpose register
@@ -34,6 +43,10 @@ pub struct Cpu {
     pub l: u8,
     pub sp: u16,    //stack pointer
     pub pc: u16,    //program counter
+    pub clk_cycle_count: u8,
+    pub cpu_state: CpuState,
+    pub current_opcode: u8,
+    pub machine_cycles_left: u8,
 }
 
 impl Cpu {
@@ -50,9 +63,49 @@ impl Cpu {
             h: 0x01, 
             l: 0x4D, 
             sp: 0xFFFE, 
-            pc: 0x0100, 
+            pc: 0x0100,
+            clk_cycle_count: 0,
+            cpu_state: CpuState::Fetch,
+            current_opcode: 0,
+            machine_cycles_left: 0,
         }
     }
+
+    /**
+     * Represents 1 clk cycle and NOT a machine cycle. Since all
+     * instructions take 1 machine cycle.
+     */
+    pub fn cycle(&mut self, memory: &mut Memory) {
+        if self.clk_cycle_count == MACHINE_CYCLE {
+            self.clk_cycle_count = 0;
+        } else {
+            self.clk_cycle_count += 1;
+            return;
+        }
+
+        match self.cpu_state {
+            CpuState::Fetch => { 
+                self.current_opcode = self.fetch(memory); 
+                self.machine_cycles_left = OPCODE_MACHINE_CYCLES[self.current_opcode as usize];
+                self.cpu_state = CpuState::PreExecute;
+            },
+            CpuState::PreExecute =>  {
+                self.machine_cycles_left -= 1;
+                if 
+            }
+            CpuState::Execute =>todo!(), //Need to figure out how many machine cycles the opcode has,
+        }
+    }
+
+    /**
+     * Command will retrieve the next instruction
+     */
+    pub fn fetch(&mut self, memory: &Memory) -> u8 {
+        let opcode = memory.read_byte(self.pc);
+        self.pc += 1;
+
+        return opcode;
+    }  
 
     /**
      * Returns the A and F registers as a 16-bit register
@@ -203,18 +256,6 @@ impl Cpu {
     pub fn get_lower_byte(value: u16) -> u8  {
         return value as u8;
     }
-
-    /**
-     * Command will retrieve the next instruction
-     */
-    pub fn fetch(&mut self, memory: &Memory) -> u8 {
-        let opcode = memory.read_byte(self.pc);
-        self.pc += 1;
-
-        return opcode;
-    }  
-
-
 
     /**
      * Does absolutely nothing but consume a machine cycle and increment the pc
@@ -593,7 +634,23 @@ impl Cpu {
      * INSTRUCTION LENGTH: 1
      */
     pub fn daa(&mut self) {
-        todo!();
+        if self.get_add_sub_flag() == 0 {
+            if self.get_carry_flag() != 0 || self.a > 0x99 {
+                self.a += 0x60;
+                self.set_carry_flag();
+            }
+            if self.get_half_carry_flag() != 0 || self.a & 0x0F > 0x09 {
+                self.a += 0x6;
+            }
+        }
+
+        if self.a == 0 {
+            self.set_zero_flag();
+        } else {
+            self.reset_zero_flag();
+        }
+
+        self.reset_half_carry_flag();
     }
 
     /**
@@ -2107,7 +2164,7 @@ impl Cpu {
             0xC8 => self.ret_cc(memory, self.get_zero_flag()),
             0xC9 => self.ret(memory),
             0xCA => self.jp_cc_u16(memory, self.get_zero_flag()),
-            0xCB => todo!("Do Prefix"),
+            0xCB => self.prefix(memory),
             0xCC => self.call_cc_u16(memory, self.get_zero_flag()),
             0xCD => self.call_u16(memory),
             0xCE => self.adc_a_u8(memory),
@@ -2822,7 +2879,10 @@ impl Cpu {
     /**
      * Function to take care of the prefix instructions
      */
-    pub fn prefix(&mut self, opcode: u8, memory: &mut Memory) {
+    pub fn prefix(&mut self, memory: &mut Memory) {
+        let opcode = memory.read_byte(self.pc);
+        self.pc += 1; 
+
         match opcode {
             0x00 => self.rlc_r8(Register::B),
             0x01 => self.rlc_r8(Register::C),

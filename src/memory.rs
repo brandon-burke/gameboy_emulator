@@ -40,6 +40,23 @@ pub struct Memory {
 }
 
 impl Memory {
+    pub fn new() -> Self {
+        Self {
+            rom_bank_0: [0; 0x4000],   
+            rom_bank_x: [0; 0x4000],   
+            vram: [0; 0x2000],         
+            sram: [0; 0x2000],        
+            wram_0: [0; 0x1000],       
+            wram_x: [0; 0x1000],   
+            echo: [0; 0x1E00],        
+            oam: [0; 0xA0],            
+            unused: [0; 0x60],         
+            io: [0; 0x80],             
+            hram: [0; 0x7F],           
+            ie_reg: [0; 0x1],          
+        }
+    }
+
     pub fn read_byte(&self, address: u16) -> u8 {
         match address {
             ROM_BANK_0_START ..= ROM_BANK_0_END => self.rom_bank_0[address as usize],

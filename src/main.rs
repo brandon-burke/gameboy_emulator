@@ -1,5 +1,7 @@
 mod cpu;
 mod memory;
+mod gameboy;
+mod opcodes;
 
 use std::env;
 use std::fs;
@@ -7,27 +9,14 @@ use std::fs;
 fn main() {
     let args: Vec<String> = env::args().collect();
     let rom_dump = fs::read(&args[1]).expect("Error reading rom binary file");
-    let mut advance = 0;
-    let mut was_prefix = false;
+    let mut cpu = cpu::Cpu::new();
+    let mut memory = memory::Memory::new();
+    let mut address: u32 = 0x0;
 
-
+    //Loading the ROM
     for byte in rom_dump {
-        print!("{:#04X}", byte);
-        /* 
-        if was_prefix {
-            println!("{:?}", LOOKUP_TABLE_PREFIX[byte as usize]);
-            was_prefix = false;
-        }
-
-        if advance == 0 {
-            match LOOKUP_TABLE[byte as usize] {
-                Opcode::PREFIX(_) => was_prefix = true,
-                _ => println!("{:?}", LOOKUP_TABLE[byte as usize]),
-            }
-            advance = LOOKUP_TABLE[byte as usize].get_value();
-        }
-
-        advance -= 1;     */       
+        println!("Address: {:04X}, Value: {:04X}", address, byte);
+        address += 1;
     }
 }
 
