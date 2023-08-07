@@ -1,7 +1,8 @@
-mod cpu;
-mod memory;
-mod gameboy;
-mod opcodes;
+pub mod cpu;
+pub mod memory;
+pub mod gameboy;
+pub mod opcodes;
+pub mod timer;
 
 use std::env;
 use std::fs;

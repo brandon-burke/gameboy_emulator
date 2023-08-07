@@ -23,6 +23,8 @@ const IO_END: u16 = 0xFF7F;
 const HRAM_START: u16 = 0xFF80;
 const HRAM_END: u16 = 0xFFFE;
 const INTERRUPT_ENABLE_START: u16 = 0xFFFF;
+const TIMER_DIV_REG: u16 = 0xFF04;
+const TIMER_TMA_REG: u16 = 0xFF06;
 
 pub struct Memory {
     rom_bank_0: [u8; 0x4000],   //16KB -> 0000h – 3FFFh (Non-switchable ROM bank)
@@ -34,7 +36,7 @@ pub struct Memory {
     echo: [u8; 0x1E00],         //     -> E000h – FDFFh (ECHO RAM) Mirror of C000h-DDFFh
     oam: [u8; 0xA0],            //     -> FE00h – FE9Fh (Object Attribute Table) Sprite information table
     unused: [u8; 0x60],         //     -> FEA0h – FEFFh (Unused)
-    io: [u8; 0x80],             //     -> FF00h – FF7Fh (I/O registers)
+    pub io: [u8; 0x80],             //     -> FF00h – FF7Fh (I/O registers)
     hram: [u8; 0x7F],           //     -> FF80h – FFFEh (HRAM)
     ie_reg: [u8; 0x1],          //     -> FFFFh         (Interrupt enable flags)
 }
@@ -84,7 +86,15 @@ impl Memory {
             WRAM_X_START ..= WRAM_X_END => self.wram_x[(address - WRAM_X_START) as usize] = data_to_write,
             ECHO_START ..= ECHO_END => panic!("I don't think we should be accessing echo memory"),
             UNUSED_START ..= UNUSED_END => panic!("I don't think we should be accessing unused memory"),
-            IO_START ..= IO_END => self.io[(address - IO_START) as usize] = data_to_write,
+            IO_START ..= IO_END => {
+                if address == TIMER_DIV_REG {
+                    self.io[(address - IO_START) as usize] = 0; 
+                } else if address == TIMER_TMA_REG {
+                    
+                } else {
+                    self.io[(address - IO_START) as usize] = data_to_write; 
+                }
+            }
             HRAM_START ..= HRAM_END => self.hram[(address - HRAM_START) as usize] = data_to_write,
             INTERRUPT_ENABLE_START => self.ie_reg[(address - INTERRUPT_ENABLE_START) as usize] = data_to_write,
             _ => panic!("MEMORY ACCESS OUT OF BOUNDS"),

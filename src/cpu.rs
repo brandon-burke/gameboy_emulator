@@ -2,6 +2,7 @@ use crate::memory::{Memory, self};
 use crate::opcodes::{OPCODE_MACHINE_CYCLES, PREFIX_OPCODE_MACHINE_CYCLES};
 
 const MACHINE_CYCLE: u8 = 4;
+const PREFIX_OPCODE: u8 = 0xCB;
 
 pub enum Conditions {
     Zero,
@@ -28,7 +29,6 @@ pub enum Register {
 
 pub enum CpuState {
     Fetch,          //Indicates the stage where we are getting the next opcode
-    PreExecute,     //Indicates the stage where we are waiting a certain length of M-Cycles before excuting the instruction
     Execute,        //Indicated the stage where we are doing that actual work of the instruction
 }
 
@@ -47,6 +47,7 @@ pub struct Cpu {
     pub cpu_state: CpuState,
     pub current_opcode: u8,
     pub machine_cycles_left: u8,
+    pub ime_flag: bool,
 }
 
 impl Cpu {
@@ -68,6 +69,7 @@ impl Cpu {
             cpu_state: CpuState::Fetch,
             current_opcode: 0,
             machine_cycles_left: 0,
+            ime_flag: false,
         }
     }
 
@@ -76,24 +78,34 @@ impl Cpu {
      * instructions take 1 machine cycle.
      */
     pub fn cycle(&mut self, memory: &mut Memory) {
+        self.clk_cycle_count += 1;
+        
         if self.clk_cycle_count == MACHINE_CYCLE {
             self.clk_cycle_count = 0;
         } else {
-            self.clk_cycle_count += 1;
             return;
         }
 
+        //I THINK I'LL HAVE SOME CLK ISSUES BY LIKE 1 MACHINE CYCLE B/C OF THE EXECUTE STAGE
         match self.cpu_state {
-            CpuState::Fetch => { 
+            CpuState::Fetch => {
                 self.current_opcode = self.fetch(memory); 
-                self.machine_cycles_left = OPCODE_MACHINE_CYCLES[self.current_opcode as usize];
-                self.cpu_state = CpuState::PreExecute;
+                
+                if self.current_opcode == PREFIX_OPCODE { 
+                    self.machine_cycles_left = PREFIX_OPCODE_MACHINE_CYCLES[self.current_opcode as usize]
+                } else {
+                    self.machine_cycles_left = OPCODE_MACHINE_CYCLES[self.current_opcode as usize]
+                }
+
+                self.cpu_state = CpuState::Execute;
             },
-            CpuState::PreExecute =>  {
-                self.machine_cycles_left -= 1;
-                if 
-            }
-            CpuState::Execute =>todo!(), //Need to figure out how many machine cycles the opcode has,
+            CpuState::Execute => { 
+                if self.machine_cycles_left > 1 {
+                    self.machine_cycles_left -= 1;
+                } else {
+                    self.exexute(self.current_opcode, memory);
+                }
+            }, 
         }
     }
 
@@ -540,6 +552,8 @@ impl Cpu {
      * THIS IS VERY SPECIAL NEED TO KNOW MORE ABOUT IT
      */
     pub fn stop(&mut self) {
+        //Need to reset the Timer divider register
+        //timer begins ticking again once stop mode ends
         todo!();
     }
 
@@ -1665,7 +1679,9 @@ impl Cpu {
         self.sp += 1;
 
         self.pc = ((upper_byte as u16) << 8) | lower_byte as u16;    
-        memory.write_byte(0xFFFF, 0x1);
+        self.ime_flag = true;
+
+        todo!("Need to come back to this instruction as we need to delay the EI flag by 1 machine cycle. They say this is like EI then RET so I might just call those 2 functions");
     }
     
     /**
@@ -1828,7 +1844,8 @@ impl Cpu {
      * INSTRUCTION LENGTH: 1
      */
     pub fn di(&mut self, memory: &mut Memory) {
-        memory.write_byte(0xFFFF, 0);
+        self.ime_flag = false;
+        todo!("May need to look back into this. One reading mentions it cancels any scheduled effects of EI instruction");
     }
 
     /**
@@ -1920,7 +1937,8 @@ impl Cpu {
      * INSTRUCTION LENGTH: 1
      */
     pub fn ei(&mut self, memory: &mut Memory) {
-        memory.write_byte(0xFFFF, 1);
+        self.ime_flag = true;
+        todo!("This instruction needs to be delayed by 1 machine cycle. Does it need to be set during the next machine cycle?");
     }
 
     /**

@@ -1,9 +1,11 @@
 use crate::cpu::Cpu;
 use crate::memory::Memory;
+use crate::timer::Timer;
 
 struct Gameboy {
     cpu: Cpu,
     memory: Memory,
+    timer: Timer,
 }
 
 impl Gameboy {
@@ -11,6 +13,7 @@ impl Gameboy {
         Self {
             cpu: Cpu::new(),
             memory: Memory::new(),
+            timer: Timer::new(),
         }
     }
 
@@ -23,5 +26,6 @@ impl Gameboy {
      */
     fn clk_cycle(&mut self) {
         self.cpu.cycle(&mut self.memory);
+        self.timer.cycle(&mut self.memory);
     }
 }
