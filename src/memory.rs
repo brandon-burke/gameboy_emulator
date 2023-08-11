@@ -24,7 +24,10 @@ const HRAM_START: u16 = 0xFF80;
 const HRAM_END: u16 = 0xFFFE;
 const INTERRUPT_ENABLE_START: u16 = 0xFFFF;
 const TIMER_DIV_REG: u16 = 0xFF04;
+const TIMER_TIMA_REG: u16 = 0xFF05;
 const TIMER_TMA_REG: u16 = 0xFF06;
+const TIMER_TAC_REG: u16 = 0xFF07;
+
 
 pub struct Memory {
     rom_bank_0: [u8; 0x4000],   //16KB -> 0000h – 3FFFh (Non-switchable ROM bank)
@@ -39,6 +42,9 @@ pub struct Memory {
     pub io: [u8; 0x80],             //     -> FF00h – FF7Fh (I/O registers)
     hram: [u8; 0x7F],           //     -> FF80h – FFFEh (HRAM)
     ie_reg: [u8; 0x1],          //     -> FFFFh         (Interrupt enable flags)
+    pub timer_div_reg_write: bool,
+    pub timer_enable_falling_edge: bool,
+    pub tima_write: bool,
 }
 
 impl Memory {
@@ -55,7 +61,10 @@ impl Memory {
             unused: [0; 0x60],         
             io: [0; 0x80],             
             hram: [0; 0x7F],           
-            ie_reg: [0; 0x1],          
+            ie_reg: [0; 0x1],    
+            timer_div_reg_write: false,
+            timer_enable_falling_edge: false,
+            tima_write: false,
         }
     }
 
@@ -88,9 +97,13 @@ impl Memory {
             UNUSED_START ..= UNUSED_END => panic!("I don't think we should be accessing unused memory"),
             IO_START ..= IO_END => {
                 if address == TIMER_DIV_REG {
-                    self.io[(address - IO_START) as usize] = 0; 
-                } else if address == TIMER_TMA_REG {
-                    
+                    self.io[(address - IO_START) as usize] = 0;
+                    self.timer_div_reg_write = true;
+                } else if address == TIMER_TAC_REG {
+                    self.timer_enable_falling_edge = self.is_timer_enable_bit_falling_edge(address, data_to_write);
+                    self.io[(address - IO_START) as usize] = data_to_write;
+                } else if address == TIMER_TIMA_REG {
+                    self.tima_write = true;
                 } else {
                     self.io[(address - IO_START) as usize] = data_to_write; 
                 }
@@ -99,5 +112,16 @@ impl Memory {
             INTERRUPT_ENABLE_START => self.ie_reg[(address - INTERRUPT_ENABLE_START) as usize] = data_to_write,
             _ => panic!("MEMORY ACCESS OUT OF BOUNDS"),
         } 
+    }
+
+    fn is_timer_enable_bit_falling_edge(&mut self, address: u16, data_to_write: u8) -> bool {
+        let old_enable_value = self.io[(address - IO_START) as usize] >> 2 & 0x1;
+        let new_enable_value = data_to_write >> 2 & 0x1;
+
+        if old_enable_value == 1 && new_enable_value == 0 {
+            return true;
+        } else {
+            return false;
+        }
     }
 }
