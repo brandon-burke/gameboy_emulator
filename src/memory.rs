@@ -45,6 +45,7 @@ pub struct Memory {
     pub timer_div_reg_write: bool,
     pub timer_enable_falling_edge: bool,
     pub tima_write: bool,
+    pub tima_write_ignore: bool,
 }
 
 impl Memory {
@@ -65,6 +66,7 @@ impl Memory {
             timer_div_reg_write: false,
             timer_enable_falling_edge: false,
             tima_write: false,
+            tima_write_ignore: false,
         }
     }
 
@@ -86,6 +88,7 @@ impl Memory {
     }
 
     pub fn write_byte(&mut self, address: u16, data_to_write: u8) {
+        //could result all flags as soon as I write to another location
         match address {
             ROM_BANK_0_START ..= ROM_BANK_0_END => self.rom_bank_0[address as usize] = data_to_write,
             ROM_BANK_X_START ..= ROM_BANK_X_END => self.rom_bank_x[(address - ROM_BANK_0_START) as usize] = data_to_write,
@@ -104,6 +107,9 @@ impl Memory {
                     self.io[(address - IO_START) as usize] = data_to_write;
                 } else if address == TIMER_TIMA_REG {
                     self.tima_write = true;
+                    if !self.tima_write_ignore {
+                        self.io[(address - IO_START) as usize] = data_to_write;
+                    }
                 } else {
                     self.io[(address - IO_START) as usize] = data_to_write; 
                 }
