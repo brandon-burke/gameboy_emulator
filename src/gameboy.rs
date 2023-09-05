@@ -17,15 +17,24 @@ impl Gameboy {
         }
     }
 
-    pub fn run(&mut self) {
-         
+    //main func
+    pub fn main(&mut self) {
+        let gameboy = Gameboy::new();
+        while true {
+            self.clk_cycle();
+        }
+
+        
     }
 
     /**
      * Represents 1 clk cycle NOT a machine cycle
      */
     fn clk_cycle(&mut self) {
-        self.cpu.cycle(&mut self.memory);
-        self.timer.cycle(&mut self.memory);
+        self.timer.cycle();
+        //time_cycle
+        //cpu_cycle
+        //gpu_cycle
+        //LCD_cycle
     }
 }

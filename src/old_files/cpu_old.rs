@@ -38,7 +38,7 @@ pub struct Cpu {
     pub c: u8,      //General Purpose register
     pub d: u8,      //General Purpose register
     pub e: u8,      //General Purpose register
-    pub f: u8,      //Flags register              Bit 7: zero flag(Z), Bit 6: add/sub flag(N), Bit 5: half carry flag(H), Bit 4: carry flag(C), Bits 3-0: NOT USED
+    pub f: u8,      //Flags register              Bit 7: zero flag(Z), Bit 6: negative flag(N), Bit 5: half carry flag(H), Bit 4: carry flag(C), Bits 3-0: NOT USED
     pub h: u8,
     pub l: u8,
     pub sp: u16,    //stack pointer
@@ -526,27 +526,7 @@ impl Cpu {
         };  
     }
 
-    /**
-    * Rotate register A right.
-    * 
-    * MACHINE CYCLE: 1
-    * INSTRUCTION LENGTH: 1
-    */
-    pub fn rrca(&mut self) {
-        let rotated_bit: u8 = Self::get_bit(self.a, 0);
-
-        self.a = (self.a >> 1) | (rotated_bit << 7);
-
-        self.reset_zero_flag();
-        self.reset_add_sub_flag();
-        self.reset_half_carry_flag();
-
-        if rotated_bit != 0 {
-            self.set_carry_flag();
-        } else {
-            self.reset_carry_flag();
-        }
-    }
+ 
 
     /**
      * THIS IS VERY SPECIAL NEED TO KNOW MORE ABOUT IT
@@ -973,7 +953,7 @@ impl Cpu {
             _ => panic!("cannot use sp or pc in a this 8 bit operation (add_a_r8)")
         };
 
-        let (result, overflow) = self.a.overflowing_add(value);
+        let (result, overflow) = self.a.overflowing_add(value); 
         let half_carry_overflow = (self.a & 0xF) + (value & 0xF) > 0xF;
 
         self.a = result;

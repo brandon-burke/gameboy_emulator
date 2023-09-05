@@ -3,6 +3,7 @@ pub mod memory;
 pub mod gameboy;
 pub mod opcodes;
 pub mod timer;
+pub mod binary_utils;
 
 use std::env;
 use std::fs;

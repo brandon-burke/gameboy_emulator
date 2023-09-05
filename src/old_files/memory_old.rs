@@ -1,4 +1,4 @@
-use crate::timer::Timer;
+
 
 const ROM_BANK_0_START: u16 = 0x0000;
 const ROM_BANK_0_END: u16 = 0x3FFF;
@@ -23,12 +23,11 @@ const IO_END: u16 = 0xFF7F;
 const HRAM_START: u16 = 0xFF80;
 const HRAM_END: u16 = 0xFFFE;
 const INTERRUPT_ENABLE_START: u16 = 0xFFFF;
-const TIMER_START: u16 = 0xFF04;
-const TIMER_END: u16 = 0xFF07;
 const TIMER_DIV_REG: u16 = 0xFF04;
 const TIMER_TIMA_REG: u16 = 0xFF05;
 const TIMER_TMA_REG: u16 = 0xFF06;
 const TIMER_TAC_REG: u16 = 0xFF07;
+
 
 pub struct Memory {
     rom_bank_0: [u8; 0x4000],   //16KB -> 0000h – 3FFFh (Non-switchable ROM bank)
@@ -40,9 +39,13 @@ pub struct Memory {
     echo: [u8; 0x1E00],         //     -> E000h – FDFFh (ECHO RAM) Mirror of C000h-DDFFh
     oam: [u8; 0xA0],            //     -> FE00h – FE9Fh (Object Attribute Table) Sprite information table
     unused: [u8; 0x60],         //     -> FEA0h – FEFFh (Unused)
-    timer: Timer,               //     -> FF04 - FF07
+    pub io: [u8; 0x80],         //     -> FF00h – FF7Fh (I/O registers)
     hram: [u8; 0x7F],           //     -> FF80h – FFFEh (HRAM)
     ie_reg: [u8; 0x1],          //     -> FFFFh         (Interrupt enable flags)
+    pub timer_div_reg_write: bool,
+    pub timer_enable_falling_edge: bool,
+    pub tima_write: bool,
+    pub tima_write_ignore: bool,
 }
 
 impl Memory {
@@ -56,10 +59,14 @@ impl Memory {
             wram_x: [0; 0x1000],   
             echo: [0; 0x1E00],        
             oam: [0; 0xA0],            
-            unused: [0; 0x60], 
-            timer: Timer::new(),                 
+            unused: [0; 0x60],         
+            io: [0; 0x80],             
             hram: [0; 0x7F],           
             ie_reg: [0; 0x1],    
+            timer_div_reg_write: false,
+            timer_enable_falling_edge: false,
+            tima_write: false,
+            tima_write_ignore: false,
         }
     }
 
@@ -73,19 +80,7 @@ impl Memory {
             WRAM_X_START ..= WRAM_X_END => self.wram_x[(address - WRAM_X_START) as usize],
             ECHO_START ..= ECHO_END => panic!("I don't think we should be accessing echo memory"),
             UNUSED_START ..= UNUSED_END => panic!("I don't think we should be accessing unused memory"),
-            IO_START ..= IO_END => {
-                match address {
-                    TIMER_START ..= TIMER_END => {
-                        match address {
-                            TIMER_DIV_REG => self.timer.read_div(),
-                            TIMER_TIMA_REG => self.timer.read_tima(),
-                            TIMER_TMA_REG => self.timer.read_tma(),
-                            TIMER_TAC_REG => self.timer.read_tac(),                      
-                        }
-                    }
-                    _ => todo!("The I/O device at address {} is not implemented yet", address),
-                } 
-            }
+            IO_START ..= IO_END => self.io[(address - IO_START) as usize],
             HRAM_START ..= HRAM_END => self.hram[(address - HRAM_START) as usize],
             INTERRUPT_ENABLE_START => self.ie_reg[(address - INTERRUPT_ENABLE_START) as usize],
             _ => panic!("MEMORY ACCESS OUT OF BOUNDS"),
@@ -93,6 +88,7 @@ impl Memory {
     }
 
     pub fn write_byte(&mut self, address: u16, data_to_write: u8) {
+        //could result all flags as soon as I write to another location
         match address {
             ROM_BANK_0_START ..= ROM_BANK_0_END => self.rom_bank_0[address as usize] = data_to_write,
             ROM_BANK_X_START ..= ROM_BANK_X_END => self.rom_bank_x[(address - ROM_BANK_0_START) as usize] = data_to_write,
@@ -103,21 +99,35 @@ impl Memory {
             ECHO_START ..= ECHO_END => panic!("I don't think we should be accessing echo memory"),
             UNUSED_START ..= UNUSED_END => panic!("I don't think we should be accessing unused memory"),
             IO_START ..= IO_END => {
-                match address {
-                    TIMER_START ..= TIMER_END => {
-                        match address {
-                            TIMER_DIV_REG => self.timer.write_2_div(data_to_write),
-                            TIMER_TIMA_REG => self.timer.write_2_tima(data_to_write),
-                            TIMER_TMA_REG => self.timer.write_2_tma(data_to_write),
-                            TIMER_TAC_REG => self.timer.write_2_tac(data_to_write),
-                        }
+                if address == TIMER_DIV_REG {
+                    self.io[(address - IO_START) as usize] = 0;
+                    self.timer_div_reg_write = true;
+                } else if address == TIMER_TAC_REG {
+                    self.timer_enable_falling_edge = self.is_timer_enable_bit_falling_edge(address, data_to_write);
+                    self.io[(address - IO_START) as usize] = data_to_write;
+                } else if address == TIMER_TIMA_REG {
+                    self.tima_write = true;
+                    if !self.tima_write_ignore {
+                        self.io[(address - IO_START) as usize] = data_to_write;
                     }
-                    _ => todo!("The I/O device at address {} is not implemented yet", address),
+                } else {
+                    self.io[(address - IO_START) as usize] = data_to_write; 
                 }
             }
             HRAM_START ..= HRAM_END => self.hram[(address - HRAM_START) as usize] = data_to_write,
             INTERRUPT_ENABLE_START => self.ie_reg[(address - INTERRUPT_ENABLE_START) as usize] = data_to_write,
             _ => panic!("MEMORY ACCESS OUT OF BOUNDS"),
         } 
+    }
+
+    fn is_timer_enable_bit_falling_edge(&mut self, address: u16, data_to_write: u8) -> bool {
+        let old_enable_value = self.io[(address - IO_START) as usize] >> 2 & 0x1;
+        let new_enable_value = data_to_write >> 2 & 0x1;
+
+        if old_enable_value == 1 && new_enable_value == 0 {
+            return true;
+        } else {
+            return false;
+        }
     }
 }
